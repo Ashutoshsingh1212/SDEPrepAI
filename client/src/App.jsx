@@ -1,7 +1,3 @@
-
-import RecruiterDashboard from "./pages/RecruiterDashboard";
-import AdminDashboard from "./pages/AdminDashboard";
-
 import React, { useEffect, useRef, useState } from "react";
 import axios from "axios";
 import {
@@ -27,8 +23,10 @@ import {
   Smartphone,
   Palette
 } from "lucide-react";
+import RecruiterDashboard from "./pages/RecruiterDashboard";
+import AdminDashboard from "./pages/AdminDashboard";
 
-const API = import.meta.env.VITE_API_URL || "http://localhost:3001";
+const API = import.meta.env.VITE_API_URL || "https://sdeprepai.onrender.com";
 const candidateAuth = () => ({ headers: { Authorization: `Bearer ${localStorage.getItem("candidate_token") || ""}` } });
 const staffAuth = () => ({ headers: { Authorization: `Bearer ${localStorage.getItem("staff_token") || ""}` } });
 
@@ -75,9 +73,11 @@ function speak(text) {
   window.speechSynthesis.speak(utterance);
 }
 
-speechSynthesis.onvoiceschanged = () => {
-  speechSynthesis.getVoices();
-};
+if ("speechSynthesis" in window) {
+  speechSynthesis.onvoiceschanged = () => {
+    speechSynthesis.getVoices();
+  };
+}
 
 function CandidateLogin({ onLoginSuccess }) {
   const [email, setEmail] = useState("");
@@ -100,7 +100,7 @@ function CandidateLogin({ onLoginSuccess }) {
         headers: {
           "Content-Type": "application/json"
         },
-        body: JSON.stringify({ email })
+        body: JSON.stringify({ email: email.trim() })
       });
 
       const data = await res.json();
@@ -131,7 +131,7 @@ function CandidateLogin({ onLoginSuccess }) {
         headers: {
           "Content-Type": "application/json"
         },
-        body: JSON.stringify({ email, otp })
+        body: JSON.stringify({ email: email.trim(), otp: otp.trim() })
       });
 
       const data = await res.json();
@@ -314,43 +314,80 @@ function CandidateLogin({ onLoginSuccess }) {
   );
 }
 
-
 function RoleChooser({ onChoose }) {
-  return <div style={{minHeight:"100vh",display:"grid",placeItems:"center",background:"#08090c",color:"#fff",padding:24}}>
-    <div style={{width:"min(900px,100%)",textAlign:"center"}}>
-      <div style={{fontSize:12,letterSpacing:3,color:"#9aa6ff",fontWeight:800}}>AI INTERVIEWER</div>
-      <h1 style={{fontSize:42,margin:"12px 0 8px"}}>Choose your workspace</h1>
-      <p style={{color:"#9aa3b2",marginBottom:30}}>Secure role-based access with JWT for staff and OTP for candidates.</p>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:16}}>
-        {[['candidate','Candidate','Email OTP • Interview • Results'],['recruiter','Recruiter','Password • Create interviews • Invitations'],['admin','Admin','Password • Analytics • User management']].map(([key,title,desc])=><button key={key} onClick={()=>onChoose(key)} style={{textAlign:"left",padding:24,borderRadius:18,border:"1px solid #2b3240",background:"#11141b",color:"#fff",cursor:"pointer"}}><div style={{fontSize:28}}>{key==='candidate'?'🎯':key==='recruiter'?'👔':'🛡️'}</div><h2>{title}</h2><p style={{color:"#8f98aa",margin:0}}>{desc}</p></button>)}
+  return (
+    <div style={{ minHeight: "100vh", display: "grid", placeItems: "center", background: "#08090c", color: "#fff", padding: 24 }}>
+      <div style={{ width: "min(900px,100%)", textAlign: "center" }}>
+        <div style={{ fontSize: 12, letterSpacing: 3, color: "#9aa6ff", fontWeight: 800 }}>AI INTERVIEWER</div>
+        <h1 style={{ fontSize: 42, margin: "12px 0 8px" }}>Choose your workspace</h1>
+        <p style={{ color: "#9aa3b2", marginBottom: 30 }}>Secure role-based access with JWT for staff and OTP for candidates.</p>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))", gap: 16 }}>
+          {[
+            ['candidate', 'Candidate', 'Email OTP • Interview • Results'],
+            ['recruiter', 'Recruiter', 'Password • Create interviews • Invitations'],
+            ['admin', 'Admin', 'Password • Analytics • User management']
+          ].map(([key, title, desc]) => (
+            <button key={key} onClick={() => onChoose(key)} style={{ textAlign: "left", padding: 24, borderRadius: 18, border: "1px solid #2b3240", background: "#11141b", color: "#fff", cursor: "pointer" }}>
+              <div style={{ fontSize: 28 }}>{key === 'candidate' ? '🎯' : key === 'recruiter' ? '👔' : '🛡️'}</div>
+              <h2>{title}</h2>
+              <p style={{ color: "#8f98aa", margin: 0 }}>{desc}</p>
+            </button>
+          ))}
+        </div>
       </div>
     </div>
-  </div>;
+  );
 }
 
 function StaffLogin({ role, onSuccess, onBack }) {
-  const [email,setEmail]=useState(""); const [password,setPassword]=useState(""); const [name,setName]=useState(""); const [register,setRegister]=useState(false); const [error,setError]=useState(""); const [loading,setLoading]=useState(false);
-  async function submit(e){e.preventDefault();setError("");setLoading(true);try{
-    const endpoint=register?"/api/auth/register":"/api/auth/login";
-    const body=register?{name,email,password,role:"recruiter"}:{email,password,role};
-    const r=await fetch(`${API}${endpoint}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});const data=await r.json();if(!r.ok)throw new Error(data.error||"Authentication failed");
-    localStorage.setItem("staff_token",data.token);localStorage.setItem("staff_user",JSON.stringify(data.user));onSuccess(data.user);
-  }catch(e){setError(e.message)}finally{setLoading(false)}}
-  return <div style={{minHeight:"100vh",display:"grid",placeItems:"center",background:"#08090c",color:"#fff",padding:24}}>
-    <form onSubmit={submit} style={{width:"min(420px,100%)",background:"#11141b",border:"1px solid #292f3d",borderRadius:18,padding:28}}>
-      <button type="button" onClick={onBack} style={{background:"none",border:0,color:"#9aa3b2",cursor:"pointer"}}>← Back</button>
-      <h1>{register?"Recruiter registration":`${role[0].toUpperCase()+role.slice(1)} login`}</h1>
-      <p style={{color:"#8f98aa"}}>{role==='admin'?"Admin access":register?"Create a recruiter account":"Staff members use email + password"}</p>
-      {error&&<div style={{background:"#3a1114",color:"#ffb3ba",padding:10,borderRadius:8,marginBottom:12}}>{error}</div>}
-      {register&&<input required placeholder="Full name" value={name} onChange={e=>setName(e.target.value)} style={fieldStyle}/>}
-      <input required type="email" placeholder="Email" value={email} onChange={e=>setEmail(e.target.value)} style={fieldStyle}/>
-      <input required type="password" minLength={8} placeholder="Password (8+ characters)" value={password} onChange={e=>setPassword(e.target.value)} style={fieldStyle}/>
-      <button disabled={loading} style={{width:"100%",padding:12,border:0,borderRadius:10,background:"#eef0ff",color:"#111",fontWeight:800,cursor:"pointer"}}>{loading?"Please wait…":register?"Create recruiter":"Login"}</button>
-      {role==='recruiter'&&<button type="button" onClick={()=>setRegister(v=>!v)} style={{marginTop:14,background:"none",border:0,color:"#aeb8ff",cursor:"pointer"}}>{register?"Already have an account? Login":"Need a recruiter account? Register"}</button>}
-    </form>
-  </div>;
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [name, setName] = useState("");
+  const [register, setRegister] = useState(false);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  async function submit(e) {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+    try {
+      const endpoint = register ? "/api/auth/register" : "/api/auth/login";
+      const body = register ? { name, email, password, role: "recruiter" } : { email, password, role };
+      const r = await fetch(`${API}${endpoint}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || "Authentication failed");
+      localStorage.setItem("staff_token", data.token);
+      localStorage.setItem("staff_user", JSON.stringify(data.user));
+      onSuccess(data.user);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div style={{ minHeight: "100vh", display: "grid", placeItems: "center", background: "#08090c", color: "#fff", padding: 24 }}>
+      <form onSubmit={submit} style={{ width: "min(420px,100%)", background: "#11141b", border: "1px solid #292f3d", borderRadius: 18, padding: 28 }}>
+        <button type="button" onClick={onBack} style={{ background: "none", border: 0, color: "#9aa3b2", cursor: "pointer" }}>← Back</button>
+        <h1>{register ? "Recruiter registration" : `${role[0].toUpperCase() + role.slice(1)} login`}</h1>
+        <p style={{ color: "#8f98aa" }}>{role === 'admin' ? "Admin access" : register ? "Create a recruiter account" : "Staff members use email + password"}</p>
+        {error && <div style={{ background: "#3a1114", color: "#ffb3ba", padding: 10, borderRadius: 8, marginBottom: 12 }}>{error}</div>}
+        {register && <input required placeholder="Full name" value={name} onChange={e => setName(e.target.value)} style={fieldStyle} />}
+        <input required type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} style={fieldStyle} />
+        <input required type="password" minLength={8} placeholder="Password (8+ characters)" value={password} onChange={e => setPassword(e.target.value)} style={fieldStyle} />
+        <button disabled={loading} style={{ width: "100%", padding: 12, border: 0, borderRadius: 10, background: "#eef0ff", color: "#111", fontWeight: 800, cursor: "pointer" }}>{loading ? "Please wait…" : register ? "Create recruiter" : "Login"}</button>
+        {role === 'recruiter' && <button type="button" onClick={() => setRegister(v => !v)} style={{ marginTop: 14, background: "none", border: 0, color: "#aeb8ff", cursor: "pointer" }}>{register ? "Already have an account? Login" : "Need a recruiter account? Register"}</button>}
+      </form>
+    </div>
+  );
 }
-const fieldStyle={width:"100%",boxSizing:"border-box",padding:12,borderRadius:10,border:"1px solid #303746",background:"#0b0e13",color:"#fff",marginBottom:12};
+const fieldStyle = { width: "100%", boxSizing: "border-box", padding: 12, borderRadius: 10, border: "1px solid #303746", background: "#0b0e13", color: "#fff", marginBottom: 12 };
 
 export default function App() {
   const [candidateUser, setCandidateUser] = useState(localStorage.getItem("candidate_email") || null);
@@ -386,26 +423,20 @@ export default function App() {
     all: []
   });
 
- const recognitionRef = useRef(null);
-const videoRef = useRef(null);
-const transcriptRef = useRef(null);
-const streamRef = useRef(null);
-const canvasRef = useRef(null);
+  const recognitionRef = useRef(null);
+  const videoRef = useRef(null);
+  const transcriptRef = useRef(null);
+  const streamRef = useRef(null);
+  const canvasRef = useRef(null);
 
   async function loadDashboard() {
     try {
       const r = await axios.get(`${API}/api/v1/results`, candidateAuth());
-
       const list = r.data || [];
-
       const done = list.filter(x => x.score != null);
-
       const avg = done.length
-        ? Math.round(
-            done.reduce((a, b) => a + b.score, 0) / done.length
-          )
+        ? Math.round(done.reduce((a, b) => a + b.score, 0) / done.length)
         : 0;
-
       const best = done.length
         ? Math.round(Math.max(...done.map(x => x.score)))
         : 0;
@@ -422,39 +453,38 @@ const canvasRef = useRef(null);
     }
   }
 
-useEffect(() => {
-  if (candidateUser) loadDashboard();
-}, [candidateUser]);
+  useEffect(() => {
+    if (candidateUser) loadDashboard();
+  }, [candidateUser]);
 
-useEffect(() => {
-  if (transcriptRef.current) {
-    transcriptRef.current.scrollTop =
-      transcriptRef.current.scrollHeight;
-  }
-}, [transcript, answer]);
-
-useEffect(() => {
-  if (!candidateUser || !pendingInterviewId) return;
-  let cancelled = false;
-  (async () => {
-    try {
-      const r = await axios.get(`${API}/api/v1/interview/${pendingInterviewId}`, candidateAuth());
-      if (cancelled) return;
-      setInterview(r.data);
-      setTranscript(r.data.transcript || []);
-      setQIndex(0);
-      setSeconds(0);
-      setResult(null);
-      setScreen("interview");
-      window.history.replaceState({}, document.title, "/");
-      setTimeout(() => { if (r.data?.questions?.[0]) speak(r.data.questions[0]); }, 600);
-    } catch (error) {
-      console.error("Failed to load invited interview:", error);
-      alert(error.response?.data?.error || "This interview link is invalid or no longer available.");
+  useEffect(() => {
+    if (transcriptRef.current) {
+      transcriptRef.current.scrollTop = transcriptRef.current.scrollHeight;
     }
-  })();
-  return () => { cancelled = true; };
-}, [candidateUser, pendingInterviewId]);
+  }, [transcript, answer]);
+
+  useEffect(() => {
+    if (!candidateUser || !pendingInterviewId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await axios.get(`${API}/api/v1/interview/${pendingInterviewId}`, candidateAuth());
+        if (cancelled) return;
+        setInterview(r.data);
+        setTranscript(r.data.transcript || []);
+        setQIndex(0);
+        setSeconds(0);
+        setResult(null);
+        setScreen("interview");
+        window.history.replaceState({}, document.title, "/");
+        setTimeout(() => { if (r.data?.questions?.[0]) speak(r.data.questions[0]); }, 600);
+      } catch (error) {
+        console.error("Failed to load invited interview:", error);
+        alert(error.response?.data?.error || "This interview link is invalid or no longer available.");
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [candidateUser, pendingInterviewId]);
 
   useEffect(() => {
     if (screen !== "interview") return;
@@ -470,17 +500,13 @@ useEffect(() => {
 
         if (mounted) {
           streamRef.current = stream;
-
           if (videoRef.current) {
             videoRef.current.srcObject = stream;
           }
         }
       } catch (error) {
         console.error("Camera access denied:", error);
-
-        alert(
-          "Camera access is required for the interview. Please allow camera permission."
-        );
+        alert("Camera access is required for the interview. Please allow camera permission.");
       }
     }
 
@@ -488,7 +514,6 @@ useEffect(() => {
 
     return () => {
       mounted = false;
-
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(track => track.stop());
         streamRef.current = null;
@@ -499,7 +524,6 @@ useEffect(() => {
   const handleLogout = () => {
     localStorage.removeItem("candidate_token");
     localStorage.removeItem("candidate_email");
-
     setCandidateUser(null);
   };
 
@@ -524,7 +548,6 @@ useEffect(() => {
       setSeconds(0);
       setResult(null);
       setAnswer("");
-
       setScreen("interview");
 
       setTimeout(() => {
@@ -534,7 +557,6 @@ useEffect(() => {
       }, 1000);
     } catch (error) {
       console.error("Failed to create interview:", error);
-
       alert(
         error.response?.data?.error ||
           "Failed to create interview. Please make sure the backend is running."
@@ -552,7 +574,6 @@ useEffect(() => {
 
   async function submitAnswer() {
     const text = answer.trim();
-
     if (!text) return;
 
     const next = [
@@ -574,14 +595,9 @@ useEffect(() => {
         candidateAuth()
       );
 
-      if (
-        qIndex <
-        interview.questions.length - 1
-      ) {
+      if (qIndex < interview.questions.length - 1) {
         const ni = qIndex + 1;
-
         setQIndex(ni);
-
         const q = interview.questions[ni];
 
         setTranscript(t => [
@@ -594,18 +610,13 @@ useEffect(() => {
         ]);
 
         await saveAssistant(q);
-
         speak(q);
       } else {
         finish();
       }
     } catch (error) {
       console.error("Failed to submit answer:", error);
-
-      alert(
-        error.response?.data?.error ||
-          "Failed to submit answer."
-      );
+      alert(error.response?.data?.error || "Failed to submit answer.");
     }
   }
 
@@ -620,17 +631,11 @@ useEffect(() => {
       );
 
       setResult(r.data);
-
       loadDashboard();
-
       setScreen("result");
     } catch (error) {
       console.error("Failed to finish interview:", error);
-
-      alert(
-        error.response?.data?.error ||
-          "Failed to finish interview."
-      );
+      alert(error.response?.data?.error || "Failed to finish interview.");
     }
   }
 
@@ -640,28 +645,15 @@ useEffect(() => {
 
   function capturePhoto() {
     if (!videoRef.current) return;
-
     const video = videoRef.current;
-
     const canvas = document.createElement("canvas");
-
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
-
     const context = canvas.getContext("2d");
-
     if (!context) return;
 
-    context.drawImage(
-      video,
-      0,
-      0,
-      canvas.width,
-      canvas.height
-    );
-
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
     const image = canvas.toDataURL("image/png");
-
     setCapturedImage(image);
   }
 
@@ -671,10 +663,7 @@ useEffect(() => {
       window.webkitSpeechRecognition;
 
     if (!SpeechRecognition) {
-      alert(
-        "Voice recognition is not supported in this browser. Please use Google Chrome."
-      );
-
+      alert("Voice recognition is not supported in this browser. Please use Google Chrome.");
       return;
     }
 
@@ -684,7 +673,6 @@ useEffect(() => {
     }
 
     const recognition = new SpeechRecognition();
-
     recognition.lang = "en-IN";
     recognition.continuous = false;
     recognition.interimResults = true;
@@ -692,7 +680,6 @@ useEffect(() => {
 
     recognition.onstart = () => {
       console.log("Microphone started");
-
       setListening(true);
     };
 
@@ -700,14 +687,8 @@ useEffect(() => {
       let finalText = "";
       let interimText = "";
 
-      for (
-        let i = event.resultIndex;
-        i < event.results.length;
-        i++
-      ) {
-        const transcriptText =
-          event.results[i][0].transcript;
-
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const transcriptText = event.results[i][0].transcript;
         if (event.results[i].isFinal) {
           finalText += transcriptText;
         } else {
@@ -715,45 +696,28 @@ useEffect(() => {
         }
       }
 
-      const text = (
-        finalText ||
-        interimText
-      ).trim();
-
+      const text = (finalText || interimText).trim();
       if (text) {
         setAnswer(text);
       }
     };
 
     recognition.onerror = event => {
-      console.error(
-        "Speech recognition error:",
-        event.error
-      );
-
+      console.error("Speech recognition error:", event.error);
       setListening(false);
-
       if (event.error === "not-allowed") {
-        alert(
-          "Microphone permission was blocked. Please allow microphone access for localhost."
-        );
+        alert("Microphone permission was blocked. Please allow microphone access.");
       } else if (event.error === "audio-capture") {
-        alert(
-          "No microphone was detected. Check your Mac microphone settings."
-        );
+        alert("No microphone was detected. Check your microphone settings.");
       } else if (event.error === "no-speech") {
         console.log("No speech detected.");
       } else {
-        alert(
-          "Voice recognition error: " +
-            event.error
-        );
+        alert("Voice recognition error: " + event.error);
       }
     };
 
     recognition.onend = () => {
       console.log("Microphone stopped");
-
       setListening(false);
     };
 
@@ -762,32 +726,19 @@ useEffect(() => {
     try {
       recognition.start();
     } catch (error) {
-      console.error(
-        "Could not start microphone:",
-        error
-      );
-
+      console.error("Could not start microphone:", error);
       setListening(false);
     }
   }
 
-  if (staffUser?.role === "admin") return <AdminDashboard user={staffUser} onLogout={() => {localStorage.removeItem("staff_token");localStorage.removeItem("staff_user");setStaffUser(null);}} />;
-  if (staffUser?.role === "recruiter") return <RecruiterDashboard onBack={() => {localStorage.removeItem("staff_token");localStorage.removeItem("staff_user");setStaffUser(null);}} />;
+  if (staffUser?.role === "admin") return <AdminDashboard user={staffUser} onLogout={() => { localStorage.removeItem("staff_token"); localStorage.removeItem("staff_user"); setStaffUser(null); }} />;
+  if (staffUser?.role === "recruiter") return <RecruiterDashboard onBack={() => { localStorage.removeItem("staff_token"); localStorage.removeItem("staff_user"); setStaffUser(null); }} />;
   if (!candidateUser && (authMode === "candidate" || pendingInterviewId)) return <CandidateLogin onLoginSuccess={u => { setCandidateUser(u.email); if (pendingInterviewId) setAuthMode("candidate"); }} />;
   if (!candidateUser && (authMode === "admin" || authMode === "recruiter")) return <StaffLogin role={authMode} onBack={() => setAuthMode(null)} onSuccess={u => setStaffUser(u)} />;
   if (!candidateUser) return <RoleChooser onChoose={role => { setAuthMode(role); const path = role === "admin" ? "/admin/login" : role === "recruiter" ? "/recruiter/login" : "/candidate/login"; window.history.pushState({}, "", path); }} />;
 
-  const currentQuestion =
-    interview?.questions?.[qIndex];
-
-  const progress =
-    interview?.questions?.length
-      ? Math.round(
-          (qIndex /
-            interview.questions.length) *
-            100
-        )
-      : 0;
+  const currentQuestion = interview?.questions?.[qIndex];
+  const progress = interview?.questions?.length ? Math.round((qIndex / interview.questions.length) * 100) : 0;
 
   if (screen === "explore") {
     return (
@@ -886,9 +837,7 @@ useEffect(() => {
       <Result
         result={result}
         transcript={transcript}
-        restart={() =>
-          setScreen("dashboard")
-        }
+        restart={() => setScreen("dashboard")}
       />
     );
   }
@@ -924,24 +873,17 @@ function Setup({ form, update, start }) {
         <div className="logo">
           <Sparkles size={20} />
         </div>
-
         <span>AI Interviewer</span>
       </div>
 
       <section className="hero">
         <div>
-          <span className="eyebrow">
-            AI-POWERED MOCK INTERVIEW
-          </span>
-
+          <span className="eyebrow">AI-POWERED MOCK INTERVIEW</span>
           <h1>
-            Practice interviews with an{" "}
-            <span>AI interviewer.</span>
+            Practice interviews with an <span>AI interviewer.</span>
           </h1>
-
           <p>
-            Get realistic questions, speak naturally,
-            and receive a structured scorecard at the end.
+            Get realistic questions, speak naturally, and receive a structured scorecard at the end.
           </p>
         </div>
       </section>
@@ -949,58 +891,35 @@ function Setup({ form, update, start }) {
       <div className="card setup">
         <div className="section-title">
           <Sparkles />
-
           <div>
             <h2>Interview setup</h2>
-
-            <p>
-              Tell the interviewer what role
-              you're preparing for.
-            </p>
+            <p>Tell the interviewer what role you're preparing for.</p>
           </div>
         </div>
 
         <div className="grid">
           <label>
             Name
-
             <input
               value={form.candidateName}
-              onChange={e =>
-                update(
-                  "candidateName",
-                  e.target.value
-                )
-              }
+              onChange={e => update("candidateName", e.target.value)}
               placeholder="Your name"
             />
           </label>
 
           <label>
             Role
-
             <input
               value={form.role}
-              onChange={e =>
-                update(
-                  "role",
-                  e.target.value
-                )
-              }
+              onChange={e => update("role", e.target.value)}
             />
           </label>
 
           <label>
             Difficulty
-
             <select
               value={form.difficulty}
-              onChange={e =>
-                update(
-                  "difficulty",
-                  e.target.value
-                )
-              }
+              onChange={e => update("difficulty", e.target.value)}
             >
               <option>Beginner</option>
               <option>Intermediate</option>
@@ -1010,27 +929,13 @@ function Setup({ form, update, start }) {
 
           <label>
             Duration
-
             <select
               value={form.duration}
-              onChange={e =>
-                update(
-                  "duration",
-                  e.target.value
-                )
-              }
+              onChange={e => update("duration", e.target.value)}
             >
-              <option value="10">
-                10 minutes
-              </option>
-
-              <option value="20">
-                20 minutes
-              </option>
-
-              <option value="30">
-                30 minutes
-              </option>
+              <option value="10">10 minutes</option>
+              <option value="20">20 minutes</option>
+              <option value="30">30 minutes</option>
             </select>
           </label>
 
@@ -1039,30 +944,18 @@ function Setup({ form, update, start }) {
               <Github size={15} />
               GitHub profile (optional)
             </span>
-
             <input
               value={form.github}
-              onChange={e =>
-                update(
-                  "github",
-                  e.target.value
-                )
-              }
+              onChange={e => update("github", e.target.value)}
               placeholder="https://github.com/username"
             />
           </label>
 
           <label className="wide">
             Job description / focus areas
-
             <textarea
               value={form.jobDescription}
-              onChange={e =>
-                update(
-                  "jobDescription",
-                  e.target.value
-                )
-              }
+              onChange={e => update("jobDescription", e.target.value)}
               placeholder="e.g. React, Node.js, system design, APIs..."
             />
           </label>
@@ -1071,13 +964,9 @@ function Setup({ form, update, start }) {
         <button
           className="primary"
           onClick={start}
-          disabled={
-            !form.candidateName ||
-            !form.role
-          }
+          disabled={!form.candidateName || !form.role}
         >
           Create interview
-
           <ArrowRight size={18} />
         </button>
       </div>
@@ -1086,13 +975,8 @@ function Setup({ form, update, start }) {
 }
 
 function Interview(p) {
-  const mins = String(
-    Math.floor(p.seconds / 60)
-  ).padStart(2, "0");
-
-  const secs = String(
-    p.seconds % 60
-  ).padStart(2, "0");
+  const mins = String(Math.floor(p.seconds / 60)).padStart(2, "0");
+  const secs = String(p.seconds % 60).padStart(2, "0");
 
   return (
     <main className="page interview-page">
@@ -1101,30 +985,21 @@ function Interview(p) {
           <div className="logo">
             <Sparkles size={18} />
           </div>
-
           <span>AI Interviewer</span>
         </div>
 
         <div className="timer">
           <Clock size={16} />
-
           {mins}:{secs}
         </div>
 
-        <button
-          className="danger"
-          onClick={p.finish}
-        >
+        <button className="danger" onClick={p.finish}>
           End interview
         </button>
       </header>
 
       <div className="progress">
-        <div
-          style={{
-            width: `${p.progress}%`
-          }}
-        />
+        <div style={{ width: `${p.progress}%` }} />
       </div>
 
       <section className="interview-layout">
@@ -1132,40 +1007,17 @@ function Interview(p) {
           <div className="camera-box">
             {!p.capturedImage ? (
               <>
-                <video
-                  ref={p.videoRef}
-                  autoPlay
-                  playsInline
-                  muted
-                />
-
-                <div className="camera-label">
-                  🔴 Camera • Live
-                </div>
-
-                <button
-                  className="capture-btn"
-                  onClick={p.capturePhoto}
-                >
+                <video ref={p.videoRef} autoPlay playsInline muted />
+                <div className="camera-label">🔴 Camera • Live</div>
+                <button className="capture-btn" onClick={p.capturePhoto}>
                   📷 Capture
                 </button>
               </>
             ) : (
               <>
-                <img
-                  src={p.capturedImage}
-                  alt="Captured"
-                  className="captured-image"
-                />
-
-                <div className="camera-label">
-                  ✓ Photo Captured
-                </div>
-
-                <button
-                  className="capture-btn"
-                  onClick={p.retakePhoto}
-                >
+                <img src={p.capturedImage} alt="Captured" className="captured-image" />
+                <div className="camera-label">✓ Photo Captured</div>
+                <button className="capture-btn" onClick={p.retakePhoto}>
                   🔄 Retake
                 </button>
               </>
@@ -1179,67 +1031,30 @@ function Interview(p) {
           </div>
 
           <h2>AI Interviewer</h2>
-
-          <p>
-            Question {p.qIndex + 1} of{" "}
-            {p.interview.questions.length}
-          </p>
+          <p>Question {p.qIndex + 1} of {p.interview.questions.length}</p>
 
           <button
-            className={
-              p.listening
-                ? "mic active"
-                : "mic"
-            }
+            className={p.listening ? "mic active" : "mic"}
             onClick={p.toggleMic}
           >
-            {p.listening ? (
-              <MicOff />
-            ) : (
-              <Mic />
-            )}
-
-            {p.listening
-              ? "Listening…"
-              : "Speak answer"}
+            {p.listening ? <MicOff /> : <Mic />}
+            {p.listening ? "Listening…" : "Speak answer"}
           </button>
         </div>
 
         <div className="chat card">
           <div className="chat-head">
             <div>
-              <span className="eyebrow">
-                LIVE INTERVIEW
-              </span>
-
-              <h2>
-                {p.currentQuestion}
-              </h2>
+              <span className="eyebrow">LIVE INTERVIEW</span>
+              <h2>{p.currentQuestion}</h2>
             </div>
           </div>
 
-        <div
-  className="transcript"
-  ref={p.transcriptRef}
->
+          <div className="transcript" ref={p.transcriptRef}>
             {p.transcript.map((x, i) => (
-              <div
-                className={
-                  x.type === "User"
-                    ? "bubble user"
-                    : "bubble"
-                }
-                key={i}
-              >
-                <b>
-                  {x.type === "User"
-                    ? "You"
-                    : "AI"}
-                </b>
-
-                <span>
-                  {x.content}
-                </span>
+              <div className={x.type === "User" ? "bubble user" : "bubble"} key={i}>
+                <b>{x.type === "User" ? "You" : "AI"}</b>
+                <span>{x.content}</span>
               </div>
             ))}
           </div>
@@ -1247,28 +1062,16 @@ function Interview(p) {
           <div className="composer">
             <textarea
               value={p.answer}
-              onChange={e =>
-                p.setAnswer(
-                  e.target.value
-                )
-              }
+              onChange={e => p.setAnswer(e.target.value)}
               onKeyDown={e => {
-                if (
-                  e.key === "Enter" &&
-                  !e.shiftKey
-                ) {
+                if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();
-
                   p.submitAnswer();
                 }
               }}
               placeholder="Type your answer or use the microphone…"
             />
-
-            <button
-              className="send"
-              onClick={p.submitAnswer}
-            >
+            <button className="send" onClick={p.submitAnswer}>
               <ArrowRight />
             </button>
           </div>
@@ -1278,143 +1081,71 @@ function Interview(p) {
   );
 }
 
-function Result({
-  result,
-  transcript,
-  restart
-}) {
+function Result({ result, transcript, restart }) {
   return (
     <main className="page">
       <div className="brand">
         <div className="logo">
           <Sparkles size={20} />
         </div>
-
         <span>AI Interviewer</span>
       </div>
 
       <section className="result-hero">
-        <span className="eyebrow">
-          INTERVIEW COMPLETE
-        </span>
-
-        <h1>
-          Your interview scorecard
-        </h1>
-
+        <span className="eyebrow">INTERVIEW COMPLETE</span>
+        <h1>Your interview scorecard</h1>
         <div className="score">
-          {Math.round(
-            result?.score || 0
-          )}
-
+          {Math.round(result?.score || 0)}
           <small>/100</small>
         </div>
-
-        <p>
-          {result?.summary}
-        </p>
+        <p>{result?.summary}</p>
       </section>
 
       <div className="result-grid">
         <div className="card">
           <h3>Strengths</h3>
-
-          {(result?.strengths || []).map(
-            (x, i) => (
-              <div
-                className="item"
-                key={i}
-              >
-                ✓ {x}
-              </div>
-            )
-          )}
+          {(result?.strengths || []).map((x, i) => (
+            <div className="item" key={i}>
+              ✓ {x}
+            </div>
+          ))}
         </div>
 
         <div className="card">
-          <h3>
-            Areas to improve
-          </h3>
-
-          {(result?.weaknesses || []).map(
-            (x, i) => (
-              <div
-                className="item"
-                key={i}
-              >
-                • {x}
-              </div>
-            )
-          )}
+          <h3>Areas to improve</h3>
+          {(result?.weaknesses || []).map((x, i) => (
+            <div className="item" key={i}>
+              • {x}
+            </div>
+          ))}
         </div>
 
         <div className="card wide-card">
           <h3>Action plan</h3>
-
-          {(result?.improvements || []).map(
-            (x, i) => (
-              <div
-                className="item"
-                key={i}
-              >
-                {i + 1}. {x}
-              </div>
-            )
-          )}
+          {(result?.improvements || []).map((x, i) => (
+            <div className="item" key={i}>
+              {i + 1}. {x}
+            </div>
+          ))}
         </div>
       </div>
 
-      <button
-        className="primary"
-        onClick={restart}
-      >
+      <button className="primary" onClick={restart}>
         <RotateCcw size={18} />
-
         Start another interview
       </button>
     </main>
   );
 }
 
-function AppShell({
-  active,
-  onNav,
-  candidateName,
-  candidateEmail,
-  onLogout,
-  children
-}) {
+function AppShell({ active, onNav, candidateName, candidateEmail, onLogout, children }) {
   const navItems = [
-    {
-      key: "dashboard",
-      label: "Dashboard",
-      icon: "🏠"
-    },
-    {
-      key: "setup",
-      label: "Practice",
-      icon: "🎯"
-    },
-    {
-      key: "explore",
-      label: "Explore Interviews",
-      icon: "📚"
-    },
-    {
-      key: "history",
-      label: "History",
-      icon: "📊"
-    },
-    {
-      key: "settings",
-      label: "Settings",
-      icon: "⚙️"
-    },
-    {
-      key: "recruiter",
-      label: "Recruiter",
-      icon: "📅"
-    }
+    { key: "dashboard", label: "Dashboard", icon: "🏠" },
+    { key: "setup", label: "Practice", icon: "🎯" },
+    { key: "explore", label: "Explore Interviews", icon: "📚" },
+    { key: "history", label: "History", icon: "📊" },
+    { key: "settings", label: "Settings", icon: "⚙️" },
+    { key: "recruiter", label: "Recruiter", icon: "📅" }
   ];
 
   return (
@@ -1431,24 +1162,13 @@ function AppShell({
           <div className="logo">
             <Sparkles size={18} />
           </div>
-
           <span>AI Interviewer</span>
         </div>
 
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "12px"
-          }}
-        >
+        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
           <div className="user-chip">
-            👤{" "}
-            {candidateEmail ||
-              candidateName ||
-              "Candidate"}
+            👤 {candidateEmail || candidateName || "Candidate"}
           </div>
-
           <button
             onClick={onLogout}
             style={{
@@ -1472,42 +1192,24 @@ function AppShell({
           {navItems.map(i => (
             <button
               key={i.key}
-              className={
-                active === i.key
-                  ? "nav-item active"
-                  : "nav-item"
-              }
-              onClick={() =>
-                onNav(i.key)
-              }
+              className={active === i.key ? "nav-item active" : "nav-item"}
+              onClick={() => onNav(i.key)}
             >
-              <span>{i.icon}</span>{" "}
-              {i.label}
+              <span>{i.icon}</span> {i.label}
             </button>
           ))}
         </nav>
 
-        <main className="shell-content">
-          {children}
-        </main>
+        <main className="shell-content">{children}</main>
       </div>
     </div>
   );
 }
 
-function Dashboard({
-  dashboard,
-  candidateName,
-  goPractice,
-  goExplore
-}) {
+function Dashboard({ dashboard, candidateName, goPractice, goExplore }) {
   return (
     <>
-      <h1>
-        Welcome back,{" "}
-        {candidateName || "there"} 👋
-      </h1>
-
+      <h1>Welcome back, {candidateName || "there"} 👋</h1>
       <p className="muted">
         Practice role-specific interviews, track your progress, and build confidence across technical domains.
       </p>
@@ -1525,33 +1227,16 @@ function Dashboard({
 
       <div className="stat-grid">
         <div className="stat-card">
-          <span className="stat-label">
-            Interviews
-          </span>
-
-          <span className="stat-value">
-            {dashboard.count}
-          </span>
+          <span className="stat-label">Interviews</span>
+          <span className="stat-value">{dashboard.count}</span>
         </div>
-
         <div className="stat-card">
-          <span className="stat-label">
-            Avg Score
-          </span>
-
-          <span className="stat-value">
-            {dashboard.avg}
-          </span>
+          <span className="stat-label">Avg Score</span>
+          <span className="stat-value">{dashboard.avg}</span>
         </div>
-
         <div className="stat-card">
-          <span className="stat-label">
-            Best
-          </span>
-
-          <span className="stat-value">
-            {dashboard.best}
-          </span>
+          <span className="stat-label">Best</span>
+          <span className="stat-value">{dashboard.best}</span>
         </div>
       </div>
 
@@ -1566,61 +1251,48 @@ function Dashboard({
       <div className="recent-list">
         {dashboard.recent.length === 0 && (
           <div className="recent-row">
-            <span className="muted">
-              No interviews yet — start your
-              first one!
-            </span>
+            <span className="muted">No interviews yet — start your first one!</span>
           </div>
         )}
 
         {dashboard.recent.map(r => (
-          <div
-            className="recent-row"
-            key={r.id}
-          >
-            <span>
-              {r.role}
-            </span>
-
-            <span>
-              {r.score != null
-                ? `${Math.round(
-                    r.score
-                  )}/100`
-                : r.status}
-            </span>
+          <div className="recent-row" key={r.id}>
+            <span>{r.role}</span>
+            <span>{r.score != null ? `${Math.round(r.score)}/100` : r.status}</span>
           </div>
         ))}
       </div>
 
-      <button
-        className="primary"
-        onClick={goPractice}
-      >
-        Start Interview{" "}
-        <ArrowRight size={18} />
+      <button className="primary" onClick={goPractice}>
+        Start Interview <ArrowRight size={18} />
       </button>
     </>
   );
 }
 
-
 const INTERVIEW_CATALOG = [
-  { id:"py", domain:"Programming", domainKey:"software", role:"Python Developer", title:"Junior Python Dev", duration:30, difficulty:"Easy", skills:["Python","OOP","APIs"], description:"Python fundamentals, object-oriented programming, APIs and practical debugging.", icon:Code2, featured:true },
-  { id:"node", domain:"Programming", domainKey:"software", role:"Node.js Developer", title:"Junior Node.js Dev", duration:25, difficulty:"Easy", skills:["Node.js","Express","REST"], description:"Node.js, Express, REST APIs, async programming and backend fundamentals." , icon:Code2},
-  { id:"react", domain:"Programming", domainKey:"software", role:"Frontend Developer", title:"React Frontend Interview", duration:35, difficulty:"Medium", skills:["React","JavaScript","CSS"], description:"React components, state, hooks, browser fundamentals and frontend architecture.", icon:Code2, featured:true },
-  { id:"java", domain:"Programming", domainKey:"software", role:"Java Developer", title:"Java Backend Interview", duration:35, difficulty:"Medium", skills:["Java","Spring","SQL"], description:"Java, Spring-style backend concepts, APIs, databases and problem solving.", icon:Code2},
-  { id:"ai", domain:"AI / Machine Learning", domainKey:"ai", role:"AI Engineer", title:"AI / ML Engineer", duration:45, difficulty:"Hard", skills:["ML","LLMs","RAG"], description:"Machine learning, LLM applications, RAG, evaluation and production AI systems.", icon:BrainCircuit, featured:true},
-  { id:"data", domain:"Data", domainKey:"data", role:"Data Scientist", title:"Data Science Interview", duration:40, difficulty:"Medium", skills:["Python","SQL","Statistics"], description:"Statistics, SQL, analytics, experiments and practical data science reasoning.", icon:Database, featured:true},
-  { id:"sql", domain:"Data", domainKey:"data", role:"SQL Developer", title:"SQL & Analytics", duration:30, difficulty:"Easy", skills:["SQL","Joins","Window Functions"], description:"SQL querying, joins, aggregations, window functions and analytics cases.", icon:Database},
-  { id:"devops", domain:"DevOps & Cloud", domainKey:"cloud", role:"DevOps Engineer", title:"DevOps / Cloud Interview", duration:40, difficulty:"Hard", skills:["AWS","Docker","Kubernetes"], description:"Cloud architecture, containers, Kubernetes, CI/CD and operational troubleshooting.", icon:Cloud, featured:true},
-  { id:"security", domain:"Cybersecurity", domainKey:"security", role:"Security Engineer", title:"Cybersecurity Interview", duration:40, difficulty:"Hard", skills:["Web Security","IAM","Threats"], description:"Application security, identity, threat modeling, incident response and cloud security.", icon:ShieldCheck},
-  { id:"mobile", domain:"Mobile Development", domainKey:"mobile", role:"Mobile Developer", title:"Mobile App Interview", duration:35, difficulty:"Medium", skills:["Android","Flutter","React Native"], description:"Mobile architecture, state, performance, APIs and cross-platform development.", icon:Smartphone},
-  { id:"product", domain:"Product / Design", domainKey:"product", role:"Product Manager", title:"Product Case Interview", duration:35, difficulty:"Medium", skills:["Product Sense","UX","Metrics"], description:"Product sense, prioritisation, UX thinking, metrics and product case studies.", icon:Palette},
+  { id: "py", domain: "Programming", domainKey: "software", role: "Python Developer", title: "Junior Python Dev", duration: 30, difficulty: "Easy", skills: ["Python", "OOP", "APIs"], description: "Python fundamentals, object-oriented programming, APIs and practical debugging.", icon: Code2, featured: true },
+  { id: "node", domain: "Programming", domainKey: "software", role: "Node.js Developer", title: "Junior Node.js Dev", duration: 25, difficulty: "Easy", skills: ["Node.js", "Express", "REST"], description: "Node.js, Express, REST APIs, async programming and backend fundamentals.", icon: Code2 },
+  { id: "react", domain: "Programming", domainKey: "software", role: "Frontend Developer", title: "React Frontend Interview", duration: 35, difficulty: "Medium", skills: ["React", "JavaScript", "CSS"], description: "React components, state, hooks, browser fundamentals and frontend architecture.", icon: Code2, featured: true },
+  { id: "java", domain: "Programming", domainKey: "software", role: "Java Developer", title: "Java Backend Interview", duration: 35, difficulty: "Medium", skills: ["Java", "Spring", "SQL"], description: "Java, Spring-style backend concepts, APIs, databases and problem solving.", icon: Code2 },
+  { id: "ai", domain: "AI / Machine Learning", domainKey: "ai", role: "AI Engineer", title: "AI / ML Engineer", duration: 45, difficulty: "Hard", skills: ["ML", "LLMs", "RAG"], description: "Machine learning, LLM applications, RAG, evaluation and production AI systems.", icon: BrainCircuit, featured: true },
+  { id: "data", domain: "Data", domainKey: "data", role: "Data Scientist", title: "Data Science Interview", duration: 40, difficulty: "Medium", skills: ["Python", "SQL", "Statistics"], description: "Statistics, SQL, analytics, experiments and practical data science reasoning.", icon: Database, featured: true },
+  { id: "sql", domain: "Data", domainKey: "data", role: "SQL Developer", title: "SQL & Analytics", duration: 30, difficulty: "Easy", skills: ["SQL", "Joins", "Window Functions"], description: "SQL querying, joins, aggregations, window functions and analytics cases.", icon: Database },
+  { id: "devops", domain: "DevOps & Cloud", domainKey: "cloud", role: "DevOps Engineer", title: "DevOps / Cloud Interview", duration: 40, difficulty: "Hard", skills: ["AWS", "Docker", "Kubernetes"], description: "Cloud architecture, containers, Kubernetes, CI/CD and operational troubleshooting.", icon: Cloud, featured: true },
+  { id: "security", domain: "Cybersecurity", domainKey: "security", role: "Security Engineer", title: "Cybersecurity Interview", duration: 40, difficulty: "Hard", skills: ["Web Security", "IAM", "Threats"], description: "Application security, identity, threat modeling, incident response and cloud security.", icon: ShieldCheck },
+  { id: "mobile", domain: "Mobile Development", domainKey: "mobile", role: "Mobile Developer", title: "Mobile App Interview", duration: 35, difficulty: "Medium", skills: ["Android", "Flutter", "React Native"], description: "Mobile architecture, state, performance, APIs and cross-platform development.", icon: Smartphone },
+  { id: "product", domain: "Product / Design", domainKey: "product", role: "Product Manager", title: "Product Case Interview", duration: 35, difficulty: "Medium", skills: ["Product Sense", "UX", "Metrics"], description: "Product sense, prioritisation, UX thinking, metrics and product case studies.", icon: Palette }
 ];
 
 const DOMAIN_FILTERS = [
-  ["all","All domains"],["software","Programming"],["ai","AI / ML"],["data","Data"],["cloud","DevOps & Cloud"],["security","Cybersecurity"],["mobile","Mobile"],["product","Product / Design"]
+  ["all", "All domains"],
+  ["software", "Programming"],
+  ["ai", "AI / ML"],
+  ["data", "Data"],
+  ["cloud", "DevOps & Cloud"],
+  ["security", "Cybersecurity"],
+  ["mobile", "Mobile"],
+  ["product", "Product / Design"]
 ];
 
 function PracticeCatalog({ onStart }) {
@@ -1633,75 +1305,63 @@ function PracticeCatalog({ onStart }) {
     .filter(x => domain === "all" || x.domainKey === domain)
     .filter(x => difficulty === "all" || x.difficulty === difficulty)
     .filter(x => `${x.title} ${x.role} ${x.domain} ${x.skills.join(" ")}`.toLowerCase().includes(query.toLowerCase()))
-    .sort((a,b) => sort === "duration" ? a.duration-b.duration : sort === "difficulty" ? ["Easy","Medium","Hard"].indexOf(a.difficulty)-["Easy","Medium","Hard"].indexOf(b.difficulty) : Number(b.featured)-Number(a.featured));
+    .sort((a, b) => sort === "duration" ? a.duration - b.duration : sort === "difficulty" ? ["Easy", "Medium", "Hard"].indexOf(a.difficulty) - ["Easy", "Medium", "Hard"].indexOf(b.difficulty) : Number(b.featured) - Number(a.featured));
 
-  return <div className="catalog-page">
-    <div className="catalog-hero">
-      <div>
-        <span className="eyebrow">INTERVIEW PREP LIBRARY</span>
-        <h1>More Interview Prep</h1>
-        <p>Practice with domain-specific AI mock interviews designed around real technical and product roles.</p>
+  return (
+    <div className="catalog-page">
+      <div className="catalog-hero">
+        <div>
+          <span className="eyebrow">INTERVIEW PREP LIBRARY</span>
+          <h1>More Interview Prep</h1>
+          <p>Practice with domain-specific AI mock interviews designed around real technical and product roles.</p>
+        </div>
+        <div className="catalog-hero-stat"><strong>{INTERVIEW_CATALOG.length}</strong><span>interview tracks</span></div>
       </div>
-      <div className="catalog-hero-stat"><strong>{INTERVIEW_CATALOG.length}</strong><span>interview tracks</span></div>
+
+      <div className="catalog-toolbar">
+        <div className="search-box"><Search size={18} /><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search interviews, roles or skills..." /></div>
+        <div className="toolbar-select"><SlidersHorizontal size={16} /><select value={difficulty} onChange={e => setDifficulty(e.target.value)}><option value="all">All levels</option><option>Easy</option><option>Medium</option><option>Hard</option></select></div>
+        <div className="toolbar-select"><ChevronDown size={16} /><select value={sort} onChange={e => setSort(e.target.value)}><option value="recommended">Recommended</option><option value="duration">Shortest first</option><option value="difficulty">Difficulty</option></select></div>
+      </div>
+
+      <div className="domain-pills">{DOMAIN_FILTERS.map(([key, label]) => <button key={key} className={domain === key ? "domain-pill active" : "domain-pill"} onClick={() => setDomain(key)}>{label}</button>)}</div>
+
+      <div className="catalog-heading"><div><h2>{domain === "all" ? "All interview prep" : DOMAIN_FILTERS.find(x => x[0] === domain)?.[1]}</h2><p>{filtered.length} matching interviews</p></div></div>
+
+      <div className="catalog-grid">
+        {filtered.map(item => {
+          const Icon = item.icon;
+          return (
+            <article className="interview-card" key={item.id}>
+              <div className="interview-cover"><div className="cover-icon"><Icon size={42} /></div><span className="cover-badge">Interview Prep</span>{item.featured && <span className="featured-badge"><Star size={12} fill="currentColor" /> Featured</span>}</div>
+              <div className="interview-card-body"><div className="card-domain">{item.domain}</div><h3>{item.title}</h3><p>{item.description}</p><div className="card-meta"><span>◷ {item.duration}m</span><span>◒ {item.difficulty}</span></div><div className="card-tags">{item.skills.map(s => <span key={s}>{s}</span>)}</div><button className="catalog-start" onClick={() => onStart(item)}>Start practice <ArrowRight size={16} /></button></div>
+            </article>
+          );
+        })}
+      </div>
+      {filtered.length === 0 && <div className="empty-catalog"><BookOpen size={28} /><h3>No interviews found</h3><p>Try another domain, skill or difficulty.</p></div>}
     </div>
-
-    <div className="catalog-toolbar">
-      <div className="search-box"><Search size={18}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search interviews, roles or skills..."/></div>
-      <div className="toolbar-select"><SlidersHorizontal size={16}/><select value={difficulty} onChange={e=>setDifficulty(e.target.value)}><option value="all">All levels</option><option>Easy</option><option>Medium</option><option>Hard</option></select></div>
-      <div className="toolbar-select"><ChevronDown size={16}/><select value={sort} onChange={e=>setSort(e.target.value)}><option value="recommended">Recommended</option><option value="duration">Shortest first</option><option value="difficulty">Difficulty</option></select></div>
-    </div>
-
-    <div className="domain-pills">{DOMAIN_FILTERS.map(([key,label])=><button key={key} className={domain===key?"domain-pill active":"domain-pill"} onClick={()=>setDomain(key)}>{label}</button>)}</div>
-
-    <div className="catalog-heading"><div><h2>{domain === "all" ? "All interview prep" : DOMAIN_FILTERS.find(x=>x[0]===domain)?.[1]}</h2><p>{filtered.length} matching interviews</p></div></div>
-
-    <div className="catalog-grid">
-      {filtered.map(item=>{
-        const Icon=item.icon;
-        return <article className="interview-card" key={item.id}>
-          <div className="interview-cover"><div className="cover-icon"><Icon size={42}/></div><span className="cover-badge">Interview Prep</span>{item.featured && <span className="featured-badge"><Star size={12} fill="currentColor"/> Featured</span>}</div>
-          <div className="interview-card-body"><div className="card-domain">{item.domain}</div><h3>{item.title}</h3><p>{item.description}</p><div className="card-meta"><span>◷ {item.duration}m</span><span>◒ {item.difficulty}</span></div><div className="card-tags">{item.skills.map(s=><span key={s}>{s}</span>)}</div><button className="catalog-start" onClick={()=>onStart(item)}>Start practice <ArrowRight size={16}/></button></div>
-        </article>;
-      })}
-    </div>
-    {filtered.length===0 && <div className="empty-catalog"><BookOpen size={28}/><h3>No interviews found</h3><p>Try another domain, skill or difficulty.</p></div>}
-  </div>;
+  );
 }
 
 function History({ all }) {
   return (
     <>
-      <h1>
-        Interview History
-      </h1>
-
+      <h1>Interview History</h1>
       <div className="recent-list">
         {all.length === 0 && (
           <div className="recent-row">
-            <span className="muted">
-              No interviews yet.
-            </span>
+            <span className="muted">No interviews yet.</span>
           </div>
         )}
 
         {all.map(r => (
-          <div
-            className="recent-row"
-            key={r.id}
-          >
+          <div className="recent-row" key={r.id}>
             <span>
-              {r.role}{" "}
-              <span className="muted">
-                ({r.difficulty})
-              </span>
+              {r.role} <span className="muted">({r.difficulty})</span>
             </span>
-
             <span>
-              {r.score != null
-                ? `${Math.round(
-                    r.score
-                  )}/100`
-                : r.status}
+              {r.score != null ? `${Math.round(r.score)}/100` : r.status}
             </span>
           </div>
         ))}
@@ -1710,109 +1370,63 @@ function History({ all }) {
   );
 }
 
-function Settings({
-  onHistoryCleared
-}) {
-  const [loading, setLoading] =
-    useState(false);
+function Settings({ onHistoryCleared }) {
+  const [loading, setLoading] = useState(false);
+  const [statusMsg, setStatusMsg] = useState("");
 
-  const [statusMsg, setStatusMsg] =
-    useState("");
+  const handleClearHistory = async () => {
+    const confirmDelete = window.confirm(
+      "Are you sure you want to delete all past interview scorecards? This action cannot be undone."
+    );
 
-  const handleClearHistory =
-    async () => {
-      const confirmDelete =
-        window.confirm(
-          "Are you sure you want to delete all past interview scorecards? This action cannot be undone."
-        );
+    if (!confirmDelete) return;
 
-      if (!confirmDelete) return;
+    setLoading(true);
+    setStatusMsg("");
 
-      setLoading(true);
-      setStatusMsg("");
+    try {
+      const res = await fetch(`${API}/api/v1/interviews/clear`, {
+        method: "DELETE",
+        ...staffAuth()
+      });
 
-      try {
-        const res = await fetch(
-          `${API}/api/v1/interviews/clear`,
-          {
-            method: "DELETE"
-          }
-        );
+      const data = await res.json();
 
-        const data =
-          await res.json();
-
-        if (!res.ok) {
-          throw new Error(
-            data.error ||
-              "Failed to delete"
-          );
-        }
-
-        setStatusMsg(
-          "Interview history successfully cleared!"
-        );
-
-        if (onHistoryCleared) {
-          onHistoryCleared();
-        }
-      } catch (err) {
-        alert(
-          "Error: " + err.message
-        );
-      } finally {
-        setLoading(false);
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to delete");
       }
-    };
+
+      setStatusMsg("Interview history successfully cleared!");
+
+      if (onHistoryCleared) {
+        onHistoryCleared();
+      }
+    } catch (err) {
+      alert("Error: " + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
-    <div
-      style={{
-        maxWidth: 600
-      }}
-    >
+    <div style={{ maxWidth: 600 }}>
       <h1>Settings</h1>
-
-      <p
-        className="muted"
-        style={{
-          marginBottom: 24
-        }}
-      >
-        Manage your data and platform
-        preferences.
+      <p className="muted" style={{ marginBottom: 24 }}>
+        Manage your data and platform preferences.
       </p>
 
       <div
         className="card"
         style={{
-          border:
-            "1px solid #7f1d1d",
+          border: "1px solid #7f1d1d",
           background: "#1e1e2d",
           padding: 20,
           borderRadius: 12
         }}
       >
-        <h3
-          style={{
-            color: "#f87171",
-            marginBottom: 8
-          }}
-        >
-          ⚠️ Danger Zone
-        </h3>
-
-        <p
-          style={{
-            fontSize: 14,
-            color: "#94a3b8",
-            marginBottom: 16
-          }}
-        >
-          Permanently delete all past
-          mock interview records,
-          scores, and transcripts from
-          the database.
+        <h3 style={{ color: "#f87171", marginBottom: 8 }}>⚠️ Danger Zone</h3>
+        <p style={{ fontSize: 14, color: "#94a3b8", marginBottom: 16 }}>
+          Permanently delete all past mock interview records, scores, and transcripts from the database.
         </p>
 
         {statusMsg && (
@@ -1831,9 +1445,7 @@ function Settings({
         )}
 
         <button
-          onClick={
-            handleClearHistory
-          }
+          onClick={handleClearHistory}
           disabled={loading}
           style={{
             backgroundColor: "#ef4444",
@@ -1845,9 +1457,7 @@ function Settings({
             fontWeight: 600
           }}
         >
-          {loading
-            ? "Deleting..."
-            : "Clear Interview History"}
+          {loading ? "Deleting..." : "Clear Interview History"}
         </button>
       </div>
     </div>
