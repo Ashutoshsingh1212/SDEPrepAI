@@ -1,20 +1,16 @@
 import "./env.js";
-import dns from "node:dns";
 import express from "express";
 import cors from "cors";
-import nodemailer from "nodemailer";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import crypto from "node:crypto";
+import { Resend } from "resend";
 import db, { createInterview, updateInterview, getInterview, listInterviews, clearAllInterviews, createCandidate, findUserByEmail, findUserById } from "./db.js";
 import { generateQuestions, evaluateInterview } from "./ai.js";
 import { getGithubSummary } from "./github.js";
 import { requireAuth } from "./middleware.js";
 import authRoutes from "../routes/authRoutes.js";
 import resumeRoutes from "../routes/resume.js";
-
-// Ensure Node resolver prioritizes IPv4 globally
-dns.setDefaultResultOrder("ipv4first");
 
 const app = express();
 const port = Number(process.env.PORT || 3001);
@@ -26,56 +22,31 @@ app.use(express.json({ limit: "4mb" }));
 app.use("/api/auth", authRoutes);
 app.use("/api/resume", resumeRoutes);
 
-const emailUser = () => String(process.env.EMAIL_USER || "").trim();
-const emailPass = () => String(process.env.EMAIL_PASS || "").replace(/\s+/g, "");
-const emailConfigured = () => Boolean(emailUser() && emailPass());
+// --- Resend Email Setup (Works 100% on Render over HTTPS Port 443) ---
+const resendApiKey = process.env.RESEND_API_KEY?.trim();
+const resend = resendApiKey ? new Resend(resendApiKey) : null;
+const emailSender = process.env.EMAIL_FROM || "AI Interviewer <onboarding@resend.dev>";
 
-// Custom lookup to enforce IPv4 resolution only
-const ipv4Lookup = (hostname, options, callback) => {
-  return dns.lookup(hostname, { family: 4, all: false }, callback);
-};
+const emailConfigured = () => Boolean(resendApiKey);
 
-const transporter = nodemailer.createTransport({
-  host: "smtp.gmail.com",
-  port: 465,
-  secure: true,
-  lookup: ipv4Lookup,
-  auth: {
-    user: emailUser(),
-    pass: emailPass(),
-  },
-  connectionTimeout: 30000,
-  greetingTimeout: 30000,
-  socketTimeout: 30000,
-  tls: {
-    servername: "smtp.gmail.com",
-  },
-});
-
-let emailReady = false;
-if (emailConfigured()) {
-  transporter.verify()
-    .then(() => {
-      emailReady = true;
-      console.log(`✅ Gmail SMTP ready: ${emailUser()}`);
-    })
-    .catch((e) => {
-      emailReady = false;
-      console.error(`❌ Gmail SMTP error: ${e.message}`);
-    });
-} else {
-  console.log("⚠️ Gmail is not configured. Add EMAIL_USER and EMAIL_PASS to server/.env");
-}
-
-async function sendMail(options) {
-  if (!emailConfigured()) return { sent: false, error: "Email is not configured" };
+async function sendMail({ to, subject, html }) {
+  if (!emailConfigured()) {
+    return { sent: false, error: "RESEND_API_KEY is not configured" };
+  }
   try {
-    await transporter.sendMail(options);
-    emailReady = true;
-    return { sent: true };
+    const { data, error } = await resend.emails.send({
+      from: emailSender,
+      to,
+      subject,
+      html,
+    });
+    if (error) {
+      console.error("❌ Email API error:", error.message);
+      return { sent: false, error: error.message };
+    }
+    return { sent: true, id: data?.id };
   } catch (e) {
-    emailReady = false;
-    console.error("❌ EMAIL SEND ERROR:", e.message);
+    console.error("❌ Email sending failed:", e.message);
     return { sent: false, error: e.message };
   }
 }
@@ -106,7 +77,6 @@ app.get("/api/health", (_, res) =>
   res.json({
     ok: true,
     emailConfigured: emailConfigured(),
-    emailReady,
     openaiConfigured: Boolean(process.env.OPENAI_API_KEY?.trim()),
     database: true,
   })
@@ -122,12 +92,13 @@ app.post("/api/auth/send-otp", async (req, res) => {
     db.prepare(
       `INSERT INTO otp_codes(email,otp,expires_at,attempts) VALUES(?,?,?,0) ON CONFLICT(email) DO UPDATE SET otp=excluded.otp,expires_at=excluded.expires_at,attempts=0`
     ).run(email, otp, Date.now() + 5 * 60 * 1000);
+
     const mail = await sendMail({
-      from: `"AI Interviewer" <${emailUser()}>`,
       to: email,
       subject: "Your AI Interviewer OTP",
       html: `<div style="font-family:Arial;max-width:600px;margin:auto"><h2>AI Interviewer</h2><p>Your verification code is:</p><div style="font-size:32px;font-weight:bold;letter-spacing:8px;padding:20px;background:#f4f4f4;text-align:center">${otp}</div><p>Valid for 5 minutes.</p></div>`,
     });
+
     if (!mail.sent) {
       db.prepare("DELETE FROM otp_codes WHERE email=?").run(email);
       return res.status(503).json({ error: "OTP email could not be sent", details: mail.error });
@@ -200,7 +171,6 @@ async function createInterviewHandler(req, res) {
     });
     const interviewUrl = `${clientUrl}/?interview=${encodeURIComponent(id)}`;
     const mail = await sendMail({
-      from: `"AI Interviewer" <${emailUser()}>`,
       to: normalizedEmail,
       subject: `AI Interview Invitation — ${role}`,
       html: `<div style="font-family:Arial;max-width:650px;margin:auto;padding:30px"><h1>AI Interviewer</h1><h2>Hello ${candidateName}</h2><p>You have been invited to complete an AI-powered interview.</p><p><b>Role:</b> ${role}<br><b>Difficulty:</b> ${difficulty}<br><b>Duration:</b> ${duration} minutes</p><p><a href="${interviewUrl}" style="display:inline-block;background:#4f46e5;color:#fff;padding:14px 22px;border-radius:8px;text-decoration:none">Start Interview</a></p><p>${interviewUrl}</p></div>`,
@@ -300,7 +270,6 @@ app.delete("/api/v1/interviews/clear", requireAuth(["admin"]), (_, res) => {
   res.json({ success: true, message: "History cleared" });
 });
 
-// Seed admin/recruiter accounts from .env when configured
 async function seedUsers() {
   for (const [name, email, password, role] of [
     [process.env.ADMIN_NAME, process.env.ADMIN_EMAIL, process.env.ADMIN_PASSWORD, "admin"],
@@ -318,7 +287,7 @@ await seedUsers();
 app.listen(port, "0.0.0.0", () => {
   console.log("========================================");
   console.log(`🚀 Server running on port ${port}`);
-  console.log(`📧 Email: ${emailUser() || "NOT CONFIGURED"}`);
+  console.log(`📧 Email API: ${emailConfigured() ? "CONFIGURED (Resend)" : "NOT CONFIGURED"}`);
   console.log(`🤖 OpenAI: ${process.env.OPENAI_API_KEY ? "CONFIGURED" : "NOT CONFIGURED"}`);
   console.log("========================================");
 });
