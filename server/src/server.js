@@ -27,6 +27,7 @@ const emailPass = () => String(process.env.EMAIL_PASS || "").replace(/\s+/g, "")
 const emailConfigured = () => Boolean(emailUser() && emailPass());
 const transporter = nodemailer.createTransport({
   service: "gmail",
+  port: 587,
   auth: { user: emailUser(), pass: emailPass() },
   connectionTimeout: 15000,
   greetingTimeout: 15000,
