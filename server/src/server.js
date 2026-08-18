@@ -13,7 +13,7 @@ import { requireAuth } from "./middleware.js";
 import authRoutes from "../routes/authRoutes.js";
 import resumeRoutes from "../routes/resume.js";
 
-// Ensure Node resolver prioritizes IPv4
+// Ensure Node resolver prioritizes IPv4 globally
 dns.setDefaultResultOrder("ipv4first");
 
 const app = express();
@@ -30,12 +30,16 @@ const emailUser = () => String(process.env.EMAIL_USER || "").trim();
 const emailPass = () => String(process.env.EMAIL_PASS || "").replace(/\s+/g, "");
 const emailConfigured = () => Boolean(emailUser() && emailPass());
 
-// Force IPv4 and SSL over port 465 to bypass Render IPv6 routing issues
+// Custom lookup to enforce IPv4 resolution only
+const ipv4Lookup = (hostname, options, callback) => {
+  return dns.lookup(hostname, { family: 4, all: false }, callback);
+};
+
 const transporter = nodemailer.createTransport({
   host: "smtp.gmail.com",
   port: 465,
   secure: true,
-  family: 4,
+  lookup: ipv4Lookup,
   auth: {
     user: emailUser(),
     pass: emailPass(),
@@ -43,6 +47,9 @@ const transporter = nodemailer.createTransport({
   connectionTimeout: 30000,
   greetingTimeout: 30000,
   socketTimeout: 30000,
+  tls: {
+    servername: "smtp.gmail.com",
+  },
 });
 
 let emailReady = false;
