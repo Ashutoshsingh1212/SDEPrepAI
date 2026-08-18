@@ -1,4 +1,5 @@
 import "./env.js";
+import dns from "node:dns";
 import express from "express";
 import cors from "cors";
 import nodemailer from "nodemailer";
@@ -11,6 +12,8 @@ import { getGithubSummary } from "./github.js";
 import { requireAuth } from "./middleware.js";
 import authRoutes from "../routes/authRoutes.js";
 import resumeRoutes from "../routes/resume.js";
+
+dns.setDefaultResultOrder("ipv4first");
 
 const app = express();
 const port = Number(process.env.PORT || 3001);
@@ -33,10 +36,11 @@ const transporter = nodemailer.createTransport({
     user: emailUser(),
     pass: emailPass(),
   },
-  connectionTimeout: 15000,
-  greetingTimeout: 15000,
-  socketTimeout: 20000,
+  connectionTimeout: 30000,
+  greetingTimeout: 30000,
+  socketTimeout: 30000,
 });
+
 let emailReady = false;
 if (emailConfigured()) {
   transporter.verify()
