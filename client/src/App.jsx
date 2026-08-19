@@ -103,13 +103,37 @@ function CandidateLogin({ onLoginSuccess }) {
         body: JSON.stringify({ email: email.trim() })
       });
 
-      const data = await res.json();
+      const contentType = res.headers.get("content-type") || "";
+      const raw = await res.text();
 
-      if (!res.ok) {
-        throw new Error([data.error, data.details].filter(Boolean).join(": ") || "Failed to send OTP");
+      let data = {};
+
+      if (contentType.includes("application/json")) {
+        try {
+          data = JSON.parse(raw);
+        } catch (parseError) {
+          console.error("JSON PARSE ERROR:", parseError);
+          console.error("SERVER RESPONSE:", raw);
+          throw new Error("Server returned invalid JSON.");
+        }
+      } else {
+        console.error("NON-JSON RESPONSE");
+        console.error("Status:", res.status);
+        console.error("Status Text:", res.statusText);
+        console.error("Response:", raw);
+        throw new Error(
+          `Server returned ${res.status} ${res.statusText} instead of JSON.`
+        );
       }
 
-      setMsg(data.message);
+      if (!res.ok) {
+        throw new Error(
+          [data.error, data.details].filter(Boolean).join(": ") ||
+          "Failed to send OTP"
+        );
+      }
+
+      setMsg(data.message || "OTP sent successfully.");
       setStep(2);
     } catch (e) {
       setErr(e.message);
@@ -134,10 +158,40 @@ function CandidateLogin({ onLoginSuccess }) {
         body: JSON.stringify({ email: email.trim(), otp: otp.trim() })
       });
 
-      const data = await res.json();
+      const contentType = res.headers.get("content-type") || "";
+      const raw = await res.text();
+
+      let data = {};
+
+      if (contentType.includes("application/json")) {
+        try {
+          data = JSON.parse(raw);
+        } catch (parseError) {
+          console.error("JSON PARSE ERROR:", parseError);
+          console.error("SERVER RESPONSE:", raw);
+          throw new Error("Server returned invalid JSON.");
+        }
+      } else {
+        console.error("NON-JSON RESPONSE");
+        console.error("Status:", res.status);
+        console.error("Status Text:", res.statusText);
+        console.error("Response:", raw);
+        throw new Error(
+          `Server returned ${res.status} ${res.statusText} instead of JSON.`
+        );
+      }
 
       if (!res.ok) {
-        throw new Error(data.error || "Invalid OTP");
+        throw new Error(
+          [data.error, data.details].filter(Boolean).join(": ") ||
+          "Invalid OTP"
+        );
+      }
+
+      if (!data.token || !data.user) {
+        throw new Error(
+          "Login response is missing token or user information."
+        );
       }
 
       localStorage.setItem("candidate_token", data.token);
