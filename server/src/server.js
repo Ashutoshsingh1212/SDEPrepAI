@@ -14,10 +14,28 @@ import resumeRoutes from "../routes/resume.js";
 
 const app = express();
 const port = Number(process.env.PORT || 3001);
-const clientUrl = process.env.CLIENT_URL || "http://localhost:5173";
+const allowedOrigins = [
+  "http://localhost:5173",
+  "http://localhost:3000",
+  "https://loquacious-frangollo-20647e.netlify.app",
+  process.env.CLIENT_URL,
+].filter(Boolean);
+
 const jwtSecret = process.env.JWT_SECRET || "development-only-change-me";
 
-app.use(cors({ origin: clientUrl, credentials: true }));
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      if (!origin || allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+      return callback(new Error("CORS policy violation"));
+    },
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  })
+);
 app.use(express.json({ limit: "4mb" }));
 app.use("/api/auth", authRoutes);
 app.use("/api/resume", resumeRoutes);
@@ -169,7 +187,8 @@ async function createInterviewHandler(req, res) {
       transcript: "[]",
       status: "Pre",
     });
-    const interviewUrl = `${clientUrl}/?interview=${encodeURIComponent(id)}`;
+const frontendBase = process.env.CLIENT_URL || "https://loquacious-frangollo-20647e.netlify.app";
+const interviewUrl = `${frontendBase}/?interview=${encodeURIComponent(id)}`;
     const mail = await sendMail({
       to: normalizedEmail,
       subject: `AI Interview Invitation — ${role}`,
