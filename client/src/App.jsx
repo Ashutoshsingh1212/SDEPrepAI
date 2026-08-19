@@ -483,7 +483,7 @@ export default function App() {
   const streamRef = useRef(null);
   const canvasRef = useRef(null);
 
-  async function loadDashboard() {
+ async function loadDashboard() {
     try {
       const r = await axios.get(`${API}/api/v1/results`, candidateAuth());
       const list = r.data || [];
@@ -504,6 +504,10 @@ export default function App() {
       });
     } catch (e) {
       console.error(e);
+      // Auto-logout when token expires or becomes invalid
+      if (e.response?.status === 401 || e.response?.status === 403) {
+        handleLogout();
+      }
     }
   }
 
